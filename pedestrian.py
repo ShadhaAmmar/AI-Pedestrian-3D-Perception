@@ -15,9 +15,7 @@ from ultralytics import YOLO
 
 warnings.filterwarnings("ignore")
 
-# ─────────────────────────────────────────────
-#  CONFIG
-# ─────────────────────────────────────────────
+# config
 SEG_MODEL    = "yolov8n-seg.pt"
 CONF         = 0.35
 IOU          = 0.45
@@ -26,15 +24,13 @@ OUTPUT_FILE  = "output_pedestrian_3d_ai.mp4"
 TRAIL_LEN    = 32
 RISK_DIST    = 85
 
-# ★ KEY: process at this width for speed, output at original size
+# ★ key: process at this width for speed, output at original size
 PROC_W       = 640          # inference width (fast!)
-MAX_OUT_W    = 1280         # cap output width (don't write giant 4K files)
+MAX_OUT_W    = 1280         # cap output width (don't write giant 4k files)
 
 BEV_W, BEV_H = 260, 340
 
-# ─────────────────────────────────────────────
-#  COLORS (BGR)
-# ─────────────────────────────────────────────
+# colors (bgr)
 C_CYAN    = (0, 255, 220)
 C_MAG     = (200, 0, 255)
 C_YELLOW  = (0, 220, 255)
@@ -44,26 +40,24 @@ C_ORANGE  = (0, 150, 255)
 C_WHITE   = (255, 255, 255)
 C_DARK    = (8, 8, 18)
 
-# Body-part UV zones: head (top) → feet (bottom) — BGR
+# body part uv zones: head (top) → feet (bottom) — bgr
 UV_ZONES_BGR = np.array([
     [211,   0, 148],   # purple      — head
     [130,   0,  75],   # indigo      — neck
     [255,   0,   0],   # blue        — chest
-    [255, 128,   0],   # light-blue  — upper torso
+    [255, 128,   0],   # light blue  — upper torso
     [200, 255,   0],   # cyan        — stomach
     [ 50, 255,   0],   # green       — hips
-    [  0, 255, 128],   # yellow-grn  — upper leg
+    [  0, 255, 128],   # yellow grn  — upper leg
     [  0, 200, 255],   # yellow      — knee
     [  0, 128, 255],   # orange      — lower leg
-    [  0,  40, 255],   # red-orange  — ankle
-    [128,   0, 255],   # magenta-red — feet
+    [  0,  40, 255],   # red orange  — ankle
+    [128,   0, 255],   # magenta red — feet
 ], dtype=np.float32)   # shape (11, 3)
 
 N_ZONES = len(UV_ZONES_BGR)
 
-# ─────────────────────────────────────────────
-#  UTILS
-# ─────────────────────────────────────────────
+# utils
 def now_ms():  return time.perf_counter() * 1000
 def lerp(a,b,t): return a + (b-a)*t
 def clamp(v,lo,hi): return max(lo,min(hi,v))
@@ -73,9 +67,7 @@ def box_area(box):
     x1,y1,x2,y2=box; return max(0,x2-x1)*max(0,y2-y1)
 def dist2d(a,b): return math.hypot(a[0]-b[0],a[1]-b[1])
 
-# ─────────────────────────────────────────────
-#  VECTORIZED BODY-UV PAINT  ← fast numpy
-# ─────────────────────────────────────────────
+# vectorized body uv paint  ← fast numpy
 def paint_body_uv(canvas, mask_bool, box):
     """
     Paint segmentation mask with vertical body-part UV gradient.
@@ -88,40 +80,40 @@ def paint_body_uv(canvas, mask_bool, box):
     box_h = max(1, y2-y1)
     box_w = max(1, x2-x1)
 
-    # Build a (box_h,) float array 0→1 for vertical position
-    t_vals = np.linspace(0, 1, box_h, dtype=np.float32)  # (H,)
+    # build a (box_h,) float array 0→1 for vertical position
+    t_vals = np.linspace(0, 1, box_h, dtype=np.float32)  # (h,)
 
-    # Interpolate across UV_ZONES_BGR
-    idx_f  = t_vals * (N_ZONES - 1)          # (H,) float indices
-    idx_lo = np.floor(idx_f).astype(int)     # (H,)
-    idx_hi = np.minimum(idx_lo+1, N_ZONES-1) # (H,)
-    frac   = (idx_f - idx_lo)[:,None]        # (H,1)
+    # interpolate across uv_zones_bgr
+    idx_f  = t_vals * (N_ZONES - 1)          # (h,) float indices
+    idx_lo = np.floor(idx_f).astype(int)     # (h,)
+    idx_hi = np.minimum(idx_lo+1, N_ZONES-1) # (h,)
+    frac   = (idx_f - idx_lo)[:,None]        # (h,1)
 
-    # Row colors: (H, 3)
+    # row colors: (h, 3)
     row_colors = (UV_ZONES_BGR[idx_lo] * (1-frac) +
                   UV_ZONES_BGR[idx_hi] * frac).astype(np.uint8)
 
-    # Broadcast to (H, W, 3)
+    # broadcast to (h, w, 3)
     uv_patch = np.broadcast_to(
         row_colors[:, np.newaxis, :],
         (box_h, box_w, 3)
     ).copy()
 
-    # Crop mask to box region
-    m = mask_bool[y1:y2, x1:x2]  # (H, W) bool
+    # crop mask to box region
+    m = mask_bool[y1:y2, x1:x2]  # (h, w) bool
     if m.shape[0] != box_h or m.shape[1] != box_w:
         return
 
-    # Blend: 72% UV color + 28% original
+    # blend: 72% uv color + 28% original
     orig = canvas[y1:y2, x1:x2].astype(np.float32)
     blended = (orig * 0.28 + uv_patch.astype(np.float32) * 0.72).clip(0,255).astype(np.uint8)
 
-    # Write only where mask is True
+    # write only where mask is true
     region = canvas[y1:y2, x1:x2]
     region[m] = blended[m]
     canvas[y1:y2, x1:x2] = region
 
-    # Glow contour on mask edge
+    # glow contour on mask edge
     m8 = m.astype(np.uint8)*255
     cnts,_ = cv2.findContours(m8, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if cnts:
@@ -129,9 +121,7 @@ def paint_body_uv(canvas, mask_bool, box):
         top_col = tuple(int(c) for c in row_colors[0])
         cv2.drawContours(canvas, shifted, -1, top_col, 2, cv2.LINE_AA)
 
-# ─────────────────────────────────────────────
-#  SQUARED GLOWING BOX
-# ─────────────────────────────────────────────
+# squared glowing box
 def draw_box(img, pt1, pt2, color, thick=2):
     ov = img.copy()
     cv2.rectangle(ov, pt1, pt2, color, thick+7)
@@ -141,9 +131,7 @@ def draw_box(img, pt1, pt2, color, thick=2):
     inner = tuple(min(255,c+70) for c in color)
     cv2.rectangle(img,(x1+3,y1+3),(x2-3,y2-3),inner,1)
 
-# ─────────────────────────────────────────────
-#  DRAW HELPERS
-# ─────────────────────────────────────────────
+# draw helpers
 def alpha_rect(img, pt1, pt2, color, a=0.55):
     x1,y1=pt1; x2,y2=pt2
     H,W=img.shape[:2]
@@ -173,15 +161,11 @@ def pbar(cur, tot, label="", w=BAR_W):
     print(f"\r  [{'█'*d}{'░'*(w-d)}] {p*100:5.1f}%  {label}",end="",flush=True)
     if cur>=tot: print()
 
-# ─────────────────────────────────────────────
-#  SYNTHETIC DEPTH
-# ─────────────────────────────────────────────
+# synthetic depth
 def syn_depth(box, fw, fh):
     return clamp(box_area(box)/(fw*fh*0.55), 0.05, 0.95)
 
-# ─────────────────────────────────────────────
-#  TRACK
-# ─────────────────────────────────────────────
+# track
 class Track:
     _n=0
     def __init__(self,box):
@@ -203,9 +187,7 @@ class Track:
         cx,cy=cx_cy(self.box)
         self.pred=[(int(cx+self.vel[0]*i),int(cy+self.vel[1]*i)) for i in range(1,n+1)]
 
-# ─────────────────────────────────────────────
-#  TRACKER
-# ─────────────────────────────────────────────
+# tracker
 class Tracker:
     def __init__(self): self.tracks={}
 
@@ -238,9 +220,7 @@ class Tracker:
     def _prune(self):
         for k in [k for k,v in self.tracks.items() if v.miss>8]: del self.tracks[k]
 
-# ─────────────────────────────────────────────
-#  HEATMAP
-# ─────────────────────────────────────────────
+# heatmap
 class Heatmap:
     def __init__(self,h,w): self.m=np.zeros((h,w),np.float32)
 
@@ -261,9 +241,7 @@ class Heatmap:
         out=img.astype(np.float32)
         return (out*(1-a*mk)+cm.astype(np.float32)*(a*mk)).clip(0,255).astype(np.uint8)
 
-# ─────────────────────────────────────────────
-#  BIRD'S-EYE VIEW
-# ─────────────────────────────────────────────
+# bird's eye view
 def render_bev(tracks, fw, fh):
     bev=np.zeros((BEV_H,BEV_W,3),np.uint8)
     gc=(22,40,22)
@@ -282,9 +260,7 @@ def render_bev(tracks, fw, fh):
         if t.risk: cv2.circle(bev,(bx,by),r+8,C_RED,1)
     return bev
 
-# ─────────────────────────────────────────────
-#  PERSPECTIVE GRID
-# ─────────────────────────────────────────────
+# perspective grid
 def draw_grid(img):
     h,w=img.shape[:2]; hy=int(h*0.52); vp=(w//2,hy)
     ov=img.copy(); col=(0,150,90)
@@ -294,9 +270,7 @@ def draw_grid(img):
         cv2.line(ov,(int(w//2-(w//2)*t**0.55),y),(int(w//2+(w//2)*t**0.55),y),col,1)
     cv2.addWeighted(ov,0.18,img,0.82,0,img)
 
-# ─────────────────────────────────────────────
-#  COLORBAR
-# ─────────────────────────────────────────────
+# colorbar
 def draw_colorbar(img):
     h=img.shape[0]; bh=min(160,h-80); x,y=img.shape[1]-24,44
     for i in range(bh):
@@ -306,9 +280,7 @@ def draw_colorbar(img):
     txt(img,"FAR",(x-5,y+10),C_WHITE,0.30,1,False)
     txt(img,"NEAR",(x-7,y+bh-4),C_WHITE,0.30,1,False)
 
-# ─────────────────────────────────────────────
-#  COLLISION
-# ─────────────────────────────────────────────
+# collision
 def check_col(tracks):
     tl=list(tracks)
     for t in tl: t.risk=False
@@ -319,15 +291,13 @@ def check_col(tracks):
                 a.risk=b.risk=True
     return any(t.risk for t in tl)
 
-# ─────────────────────────────────────────────
-#  HUD
-# ─────────────────────────────────────────────
+# hud
 def draw_hud(img,fps,lat,np_,nt,cw,gpu,fi,total_f):
     h,w=img.shape[:2]
     alpha_rect(img,(0,0),(258,202),C_DARK,0.78)
     cv2.rectangle(img,(0,0),(258,202),C_CYAN,1)
     txt(img,"AI PEDESTRIAN 3D PERCEPTION",(6,16),C_CYAN,0.44,1)
-    txt(img,"by tubakhxn",(6,31),C_MAG,0.33,1)
+    txt(img,"developer",(6,31),C_MAG,0.33,1)
     cv2.line(img,(3,37),(255,37),C_CYAN,1)
     lines=[
         (f"FPS     : {fps:5.1f}",         C_GREEN),
@@ -356,16 +326,14 @@ def draw_hud(img,fps,lat,np_,nt,cw,gpu,fi,total_f):
     (tw,_),_=cv2.getTextSize(tag,cv2.FONT_HERSHEY_SIMPLEX,0.44,1)
     txt(img,tag,(w-tw-7,18),C_RED,0.44,1)
 
-    # processing progress bar inside HUD
+    # processing progress bar inside hud
     if total_f>0:
         prog=fi/total_f; pw=int(prog*240)
         alpha_rect(img,(6,195),(248,202),C_DARK,0.5)
         cv2.rectangle(img,(6,195),(6+pw,202),C_GREEN,-1)
         cv2.rectangle(img,(6,195),(248,202),C_CYAN,1)
 
-# ─────────────────────────────────────────────
-#  SCALE BOX
-# ─────────────────────────────────────────────
+# scale box
 def scale_box(box, sx, sy):
     x1,y1,x2,y2=box
     return (int(x1*sx),int(y1*sy),int(x2*sx),int(y2*sy))
@@ -374,15 +342,13 @@ def scale_mask(mask, out_h, out_w):
     return cv2.resize(mask.astype(np.uint8), (out_w, out_h),
                       interpolation=cv2.INTER_LINEAR).astype(bool)
 
-# ─────────────────────────────────────────────
-#  MAIN
-# ─────────────────────────────────────────────
+# main
 def main():
     device  = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     gpu     = device.type=="cuda"
     print(f"  Compute : {'GPU (CUDA) + FP16' if gpu else 'CPU (fast resize mode)'}\n")
 
-    # ── Load model ──────────────────────────────
+    # load model
     stop=threading.Event()
     sp=threading.Thread(target=_spinner,args=(f"Loading {SEG_MODEL}...",stop),daemon=True)
     sp.start()
@@ -393,7 +359,7 @@ def main():
 
     tracker=Tracker()
 
-    # ── Source ──────────────────────────────────
+    # source
     src=sys.argv[1] if len(sys.argv)>1 else 0
     print(f"  Source  : {src}")
     cap=cv2.VideoCapture(src)
@@ -406,23 +372,23 @@ def main():
     total_f = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     print(f"  Video   : {fw_orig}×{fh_orig} @ {fps_src:.1f} FPS  ({total_f} frames)")
 
-    # ── Compute output size ──────────────────────
-    # Cap output width to MAX_OUT_W for sane file sizes
+    # compute output size
+    # cap output width to max_out_w for sane file sizes
     scale_out = min(1.0, MAX_OUT_W/fw_orig)
     fw_out = int(fw_orig * scale_out)
     fh_out = int(fh_orig * scale_out)
-    # Inference scale (PROC_W wide)
+    # inference scale (proc_w wide)
     scale_inf = PROC_W / fw_orig
     fw_inf = PROC_W
     fh_inf = int(fh_orig * scale_inf)
-    # Scale from inference → output
+    # scale from inference → output
     sx = fw_out / fw_inf
     sy = fh_out / fh_inf
     print(f"  Infer   : {fw_inf}×{fh_inf}  →  Output: {fw_out}×{fh_out}")
 
     print(f"  Indexing input stream  [{total_f} frames]...")
 
-    # ── Output writer ────────────────────────────
+    # output writer
     fourcc=cv2.VideoWriter_fourcc(*"mp4v")
     writer=cv2.VideoWriter(OUTPUT_FILE,fourcc,fps_src,(fw_out,fh_out))
     print(f"  Output  : {OUTPUT_FILE}  ({fw_out}×{fh_out})\n")
@@ -453,12 +419,12 @@ def main():
             if not ret: print("  [INFO] Stream ended."); break
             fi+=1
 
-            # ── Resize for inference ──────────────
+            # resize for inference
             frame_inf=cv2.resize(frame,(fw_inf,fh_inf),interpolation=cv2.INTER_LINEAR)
-            # ── Resize for output canvas ──────────
+            # resize for output canvas
             frame_out=cv2.resize(frame,(fw_out,fh_out),interpolation=cv2.INTER_LINEAR)
 
-            # ── YOLO on small frame ───────────────
+            # yolo on small frame
             results=model.predict(
                 frame_inf,
                 classes=[PERSON_CLS], conf=CONF, iou=IOU,
@@ -482,7 +448,7 @@ def main():
                     else:
                         masks_inf.append(None)
 
-            # ── Scale boxes & masks → output size ─
+            # scale boxes & masks → output size
             boxes_out=[scale_box(b,sx,sy) for b in boxes_inf]
             masks_out=[]
             for m in masks_inf:
@@ -493,7 +459,7 @@ def main():
 
             depths=[syn_depth(b,fw_out,fh_out) for b in boxes_out]
 
-            # ── Tracking ──────────────────────────
+            # tracking
             active=tracker.update(boxes_out,depths)
             for t in active:
                 t.predict()
@@ -502,12 +468,12 @@ def main():
 
             collision=check_col(active)
 
-            # ── Render ────────────────────────────
+            # render
             canvas=frame_out.copy()
             draw_grid(canvas)
             canvas=heatmap.render(canvas,a=0.20)
 
-            # ★ Body UV coloring
+            # ★ body uv coloring
             for box,mask in zip(boxes_out,masks_out):
                 if mask is not None:
                     paint_body_uv(canvas,mask,box)
@@ -527,7 +493,7 @@ def main():
                         canvas[y1:y2,x1:x2]=(sub.astype(float)*0.3+
                                               patch.astype(float)*0.7).clip(0,255).astype(np.uint8)
 
-            # ★ Squared boxes
+            # ★ squared boxes
             for t,box in zip(active,boxes_out):
                 x1,y1,x2,y2=box
                 col=C_RED if t.risk else t.color
@@ -539,7 +505,7 @@ def main():
                 alpha_rect(canvas,(lx-2,ly-lh-3),(lx+lw+4,ly+2),C_DARK,0.80)
                 txt(canvas,label,(lx+2,ly),col,0.44,1)
 
-            # ★ Trails + prediction
+            # ★ trails + prediction
             for t in active:
                 pts=list(t.trail)
                 for i in range(1,len(pts)):
@@ -566,16 +532,16 @@ def main():
             draw_hud(canvas,fps_sm,lat,len(boxes_out),
                      len(tracker.tracks),collision,gpu,fi,total_f)
 
-            # BEV inset
+            # bev inset
             bev=render_bev(active,fw_out,fh_out)
             bx=fw_out-BEV_W-6; by=36
             if by+BEV_H<=fh_out and bx>=0:
                 canvas[by:by+BEV_H,bx:bx+BEV_W]=bev
 
             writer.write(canvas)
-            cv2.imshow("AI Pedestrian 3D Perception — tubakhxn",canvas)
+            cv2.imshow("AI Pedestrian 3D Perception ",canvas)
 
-            # Terminal progress
+            # terminal progress
             if fi%20==0:
                 pct=fi/max(total_f,1)
                 done_b=int(BAR_W*pct)

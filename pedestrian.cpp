@@ -1,6 +1,6 @@
 // pedestrian.cpp
-// Basic AI Pedestrian 3D Perception System (C++ version)
-// Minimal comments, logic follows Python version
+// basic ai pedestrian 3d perception system (c++ version)
+// minimal comments, logic follows python version
 
 #include <opencv2/opencv.hpp>
 #include <iostream>
@@ -13,7 +13,7 @@
 using namespace cv;
 using namespace std;
 
-// Config
+// config
 const float CONF = 0.35f;
 const float IOU = 0.45f;
 const int PERSON_CLS = 0;
@@ -24,7 +24,7 @@ const int PROC_W = 640;
 const int MAX_OUT_W = 1280;
 const int BEV_W = 260, BEV_H = 340;
 
-// Colors (BGR)
+// colors (bgr)
 Scalar C_CYAN(220, 255, 0);
 Scalar C_MAG(255, 0, 200);
 Scalar C_YELLOW(255, 220, 0);
@@ -34,18 +34,18 @@ Scalar C_ORANGE(255, 150, 0);
 Scalar C_WHITE(255, 255, 255);
 Scalar C_DARK(18, 8, 8);
 
-// Utility
+// utility
 float clamp(float v, float lo, float hi) { return max(lo, min(hi, v)); }
 Point cx_cy(Rect box) { return Point((box.x + box.x + box.width) / 2, (box.y + box.y + box.height) / 2); }
 float box_area(Rect box) { return max(0, box.width) * max(0, box.height); }
 float dist2d(Point a, Point b) { return hypot(a.x - b.x, a.y - b.y); }
 
-// Synthetic depth
+// synthetic depth
 float syn_depth(Rect box, int fw, int fh) {
     return clamp(box_area(box) / (fw * fh * 0.55f), 0.05f, 0.95f);
 }
 
-// Track
+// track
 struct Track {
     static int next_id;
     int tid;
@@ -83,7 +83,7 @@ struct Track {
 };
 int Track::next_id = 0;
 
-// Tracker
+// tracker
 struct Tracker {
     vector<Track> tracks;
     void update(const vector<Rect>& dets, const vector<float>& deps) {
@@ -104,7 +104,7 @@ struct Tracker {
     }
 };
 
-// Main
+// main
 int main(int argc, char** argv) {
     srand((unsigned)time(0));
     string src = argc > 1 ? argv[1] : "0";
@@ -133,10 +133,10 @@ int main(int argc, char** argv) {
         if (!cap.read(frame)) break;
         resize(frame, frame_inf, Size(fw_inf, fh_inf));
         resize(frame, frame_out, Size(fw_out, fh_out));
-        // Placeholder for YOLO detection
-        vector<Rect> boxes_inf; // Fill with detected boxes
-        vector<float> depths;   // Fill with synthetic depths
-        // Example: simulate one box in center
+        // placeholder for yolo detection
+        vector<Rect> boxes_inf; // fill with detected boxes
+        vector<float> depths;   // fill with synthetic depths
+        // example: simulate one box in center
         if (fi % 30 < 15) {
             int bx = fw_inf / 4, by = fh_inf / 4, bw = fw_inf / 2, bh = fh_inf / 2;
             boxes_inf.push_back(Rect(bx, by, bw, bh));

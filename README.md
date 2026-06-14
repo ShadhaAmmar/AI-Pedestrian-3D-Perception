@@ -1,6 +1,5 @@
 # AI Pedestrian 3D Perception System
 
-## Dev/Creator: tubakhxn
 
 This project is a real-time AI system for pedestrian 3D perception and human motion intelligence. It uses computer vision and deep learning to detect, segment, and track pedestrians in video streams, providing synthetic depth estimation and visual analytics.
 
@@ -11,7 +10,7 @@ This project is a real-time AI system for pedestrian 3D perception and human mot
 - Cinematic visualization engine
 
 ## How to Fork and Run
-1. **Fork the repository** on GitHub (https://github.com/tubakhxn/ai-pedestrian-3d-perception) or download the source code.
+1. **Fork the repository** on GitHub (https://github.com/ShadhaAmmar/AI-Pedestrian-3D-Perception) or download the source code.
 2. Clone your fork or download the ZIP and extract it.
 3. Make sure you have Python 3.8+ installed.
 4. Run `python app.py <video_file_or_camera_index>` in your terminal.
