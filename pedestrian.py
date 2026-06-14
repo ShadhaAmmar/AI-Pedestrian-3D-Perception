@@ -396,9 +396,7 @@ def main():
     heatmap=Heatmap(fh_out,fw_out)
     scrdir=Path("screenshots")
 
-    print("  ╔═════════════════════════════════════════════════╗")
-    print("  ║  CINEMATIC VISUALIZATION ENGINE — RUNNING      ║")
-    print("  ╚═════════════════════════════════════════════════╝\n")
+    print("  CINEMATIC VISUALIZATION ENGINE — RUNNING\n")
 
     paused=False; fi=0; fps_sm=fps_src; canvas=None
 
@@ -555,7 +553,7 @@ def main():
         print()
         cap.release(); writer.release(); cv2.destroyAllWindows()
         print(f"\n  ✓  Saved → {OUTPUT_FILE}  ({fw_out}×{fh_out})")
-        print("  ═══════════════════════════════════════════════")
+        print()
 
 if __name__=="__main__":
     print("  Loading AI perception models...")
