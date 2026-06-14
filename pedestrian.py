@@ -1,73 +1,9 @@
-"""
-================================================
-AI PEDESTRIAN 3D PERCEPTION SYSTEM
-REAL-TIME HUMAN MOTION INTELLIGENCE AI
-================================================
-Dev/Creator : tubakhxn
-GitHub      : https://github.com/tubakhxn
-================================================
-FAST MODE:
-  - yolov8n-seg.pt  (~6.7 MB only)
-  - NO MiDaS        (zero extra download)
-  - Auto-resize     (process at 640px wide)
-  - Vectorized UV   (numpy, no row loops)
-================================================
-"""
-
-# ─────────────────────────────────────────────
-#  STEP 0 — AUTO-INSTALL
-# ─────────────────────────────────────────────
-import subprocess, sys, importlib, time, threading
-
-REQUIRED = {
-    "ultralytics": "ultralytics>=8.0.0",
-    "cv2":         "opencv-python>=4.8.0",
-    "numpy":       "numpy>=1.24.0",
-    "torch":       "torch>=2.0.0",
-    "torchvision": "torchvision>=0.15.0",
-    "scipy":       "scipy>=1.10.0",
-}
-
-BAR_W = 38
-
-def _spinner(label, stop_event):
-    frames = ["⣾","⣽","⣻","⢿","⡿","⣟","⣯","⣷"]
-    i = 0
-    while not stop_event.is_set():
-        print(f"\r  {frames[i%8]}  {label}", end="", flush=True)
-        time.sleep(0.08); i += 1
-
-def _install(pkg, name):
-    stop = threading.Event()
-    t = threading.Thread(target=_spinner, args=(f"Installing {name}...", stop), daemon=True)
-    t.start()
-    subprocess.check_call([sys.executable,"-m","pip","install",pkg,"-q"],
-                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    stop.set(); t.join()
-    print(f"\r  ✓  {name:<28} installed          ")
-
-def auto_install():
-    missing = [(m,p) for m,p in REQUIRED.items()
-               if not importlib.util.find_spec(m.split(".")[0])]
-    if not missing:
-        print("  ✓  All dependencies ready.\n"); return
-    print(f"  Installing {len(missing)} package(s)...\n")
-    for mod, pkg in missing:
-        _install(pkg, mod)
-    print()
-
-print()
-print("  ╔═════════════════════════════════════════════════╗")
-print("  ║  AI PEDESTRIAN 3D PERCEPTION SYSTEM            ║")
-print("  ║  REAL-TIME HUMAN MOTION INTELLIGENCE AI        ║")
-print("  ║  Dev: tubakhxn  |  github.com/tubakhxn        ║")
-print("  ╚═════════════════════════════════════════════════╝\n")
-auto_install()
-
-# ─────────────────────────────────────────────
-#  IMPORTS
-# ─────────────────────────────────────────────
-import math, warnings, collections, os
+import sys
+import os
+import math
+import warnings
+import collections
+import time
 from pathlib import Path
 from datetime import datetime
 
@@ -484,11 +420,7 @@ def main():
     sy = fh_out / fh_inf
     print(f"  Infer   : {fw_inf}×{fh_inf}  →  Output: {fw_out}×{fh_out}")
 
-    # ── Progress bar for video "loading" ─────────
-    print(f"  Indexing video  [{total_f} frames]")
-    for i in range(0,BAR_W+1,2):
-        pbar(i,BAR_W,""); time.sleep(0.012)
-    print(f"\r  [{'█'*BAR_W}] 100.0%  Ready!              ")
+    print(f"  Indexing input stream  [{total_f} frames]...")
 
     # ── Output writer ────────────────────────────
     fourcc=cv2.VideoWriter_fourcc(*"mp4v")
